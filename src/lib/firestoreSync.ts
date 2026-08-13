@@ -1,0 +1,143 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+  onSnapshot,
+  deleteDoc,
+  query,
+  orderBy
+} from 'firebase/firestore';
+import fs from 'fs';
+import path from 'path';
+
+// Load config from firebase-applet-config.json safely
+let firebaseConfig: any = {};
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch (e) {
+  console.error('Error loading firebase-applet-config.json:', e);
+}
+
+// Initialize Firebase App
+export const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Get Firestore instance for specific database ID
+const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId.trim() !== '')
+  ? firebaseConfig.firestoreDatabaseId
+  : '(default)';
+
+export const db = getFirestore(firebaseApp, dbId);
+
+// Collection References
+const CHATS_COL = 'chats';
+const MESSAGES_COL = 'messages';
+const SETTINGS_COL = 'settings';
+
+// Save or Update a Chat in Firestore
+export async function syncChatToFirestore(chat: any) {
+  if (!chat || !chat.id) return;
+  try {
+    const chatRef = doc(db, CHATS_COL, chat.id);
+    await setDoc(chatRef, JSON.parse(JSON.stringify(chat)), { merge: true });
+  } catch (err) {
+    console.error(`Firestore sync error for chat ${chat.id}:`, err);
+  }
+}
+
+// Save or Update a Message in Firestore
+export async function syncMessageToFirestore(message: any) {
+  if (!message || !message.id) return;
+  try {
+    const msgRef = doc(db, MESSAGES_COL, message.id);
+    await setDoc(msgRef, JSON.parse(JSON.stringify(message)), { merge: true });
+  } catch (err) {
+    console.error(`Firestore sync error for message ${message.id}:`, err);
+  }
+}
+
+// Save Widget Config Settings to Firestore
+export async function syncWidgetConfigToFirestore(config: any) {
+  try {
+    const configRef = doc(db, SETTINGS_COL, 'widgetConfig');
+    await setDoc(configRef, JSON.parse(JSON.stringify(config)), { merge: true });
+  } catch (err) {
+    console.error('Firestore sync error for widgetConfig:', err);
+  }
+}
+
+// Fetch all initial data from Firestore
+export async function loadFirestoreData() {
+  try {
+    const chatsSnap = await getDocs(collection(db, CHATS_COL));
+    const messagesSnap = await getDocs(collection(db, MESSAGES_COL));
+    const settingsSnap = await getDocs(collection(db, SETTINGS_COL));
+
+    const loadedChats: any[] = [];
+    chatsSnap.forEach((docSnap) => {
+      loadedChats.push(docSnap.data());
+    });
+
+    const loadedMessages: Record<string, any[]> = {};
+    messagesSnap.forEach((docSnap) => {
+      const msg = docSnap.data();
+      if (msg && msg.chatId) {
+        if (!loadedMessages[msg.chatId]) loadedMessages[msg.chatId] = [];
+        loadedMessages[msg.chatId].push(msg);
+      }
+    });
+
+    let loadedConfig = null;
+    settingsSnap.forEach((docSnap) => {
+      if (docSnap.id === 'widgetConfig') {
+        loadedConfig = docSnap.data();
+      }
+    });
+
+    return {
+      chats: loadedChats,
+      messages: loadedMessages,
+      widgetConfig: loadedConfig,
+    };
+  } catch (err) {
+    console.error('Error loading data from Firestore:', err);
+    return null;
+  }
+}
+
+// Realtime Firestore Listener
+export function setupFirestoreRealtimeListeners(
+  onChatsUpdate: (chats: any[]) => void,
+  onMessagesUpdate: (messagesMap: Record<string, any[]>) => void
+) {
+  try {
+    // Listen to chats
+    onSnapshot(collection(db, CHATS_COL), (snapshot) => {
+      const chatsList: any[] = [];
+      snapshot.forEach((d) => chatsList.push(d.data()));
+      // Sort chats by updatedAt desc
+      chatsList.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+      onChatsUpdate(chatsList);
+    });
+
+    // Listen to messages
+    onSnapshot(collection(db, MESSAGES_COL), (snapshot) => {
+      const messagesMap: Record<string, any[]> = {};
+      snapshot.forEach((d) => {
+        const msg = d.data();
+        if (msg && msg.chatId) {
+          if (!messagesMap[msg.chatId]) messagesMap[msg.chatId] = [];
+          messagesMap[msg.chatId].push(msg);
+        }
+      });
+      onMessagesUpdate(messagesMap);
+    });
+  } catch (err) {
+    console.error('Error setting up Firestore realtime listeners:', err);
+  }
+}

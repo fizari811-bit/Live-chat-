@@ -13,6 +13,13 @@ import {
   INITIAL_WIDGET_CONFIG
 } from './src/data/mockData.js';
 import { ChatSession, ChatMessage, Agent, CannedResponse, LiveVisitor, WidgetConfig, BlockedUser, AdminUser } from './src/types.js';
+import {
+  syncChatToFirestore,
+  syncMessageToFirestore,
+  syncWidgetConfigToFirestore,
+  loadFirestoreData,
+  setupFirestoreRealtimeListeners
+} from './src/lib/firestoreSync.js';
 
 dotenv.config();
 
@@ -520,13 +527,18 @@ app.all(['/api/webhook/sms', '/api/webhook/google-sheet', '/api/webhook/incoming
       readStatus: 'delivered',
     };
 
-    if (!messages[chatId]) messages[chatId] = [];
+    chats.unshift(targetChat);
+    messages[chatId] = messages[chatId] || [];
     messages[chatId].push(newMsg);
 
     targetChat.updatedAt = new Date().toISOString();
     targetChat.lastMessage = String(content).trim();
     targetChat.lastMessageTime = 'Just now';
     targetChat.unreadCountAgent = (targetChat.unreadCountAgent || 0) + 1;
+
+    // Sync to Firestore
+    syncChatToFirestore(targetChat);
+    syncMessageToFirestore(newMsg);
 
     broadcast({
       type: 'new_message',
@@ -674,6 +686,10 @@ app.post('/api/chats', (req, res) => {
   chats.unshift(newChat);
   messages[newChatId] = [initialMsg];
 
+  // Sync to Firestore
+  syncChatToFirestore(newChat);
+  syncMessageToFirestore(initialMsg);
+
   broadcast({
     type: 'new_chat_created',
     chat: newChat,
@@ -766,6 +782,10 @@ app.post('/api/chats/:id/messages', (req, res) => {
     chat: targetChat,
   });
 
+  // Sync to Firestore
+  syncChatToFirestore(targetChat);
+  syncMessageToFirestore(newMessage);
+
   // Sync to Google Sheet
   sendInstantGoogleSheetSync(targetChat, newMessage);
 
@@ -795,6 +815,9 @@ app.patch('/api/chats/:id', (req, res) => {
   if (tags) chat.customer.tags = tags;
 
   chat.updatedAt = new Date().toISOString();
+
+  // Sync to Firestore
+  syncChatToFirestore(chat);
 
   broadcast({
     type: 'chat_updated',
@@ -835,6 +858,10 @@ app.post('/api/chats/:id/feedback', (req, res) => {
 
   // ⚡ Instant 1-Second Google Sheet Save
   sendInstantGoogleSheetSync(chat, sysMsg);
+
+  // Sync to Firestore
+  syncChatToFirestore(chat);
+  syncMessageToFirestore(sysMsg);
 
   res.json({ success: true, chat });
 });
@@ -1031,6 +1058,7 @@ app.get('/api/visitors', (req, res) => res.json(liveVisitors));
 app.get('/api/settings', (req, res) => res.json(widgetConfig));
 app.post('/api/settings', (req, res) => {
   widgetConfig = { ...widgetConfig, ...req.body };
+  syncWidgetConfigToFirestore(widgetConfig);
   broadcast({ type: 'settings_updated', widgetConfig });
   res.json(widgetConfig);
 });
@@ -1339,6 +1367,48 @@ app.post('/api/sheets/export', async (req, res) => {
 
 // Vite Middleware for Dev / Static serving for Production
 async function startServer() {
+  // Initialize Firestore Data & Realtime Listeners
+  try {
+    console.log('🔥 Initializing Firebase Firestore connection...');
+    const loadedData = await loadFirestoreData();
+    if (loadedData && loadedData.chats && loadedData.chats.length > 0) {
+      chats = loadedData.chats;
+      messages = loadedData.messages || {};
+      if (loadedData.widgetConfig) widgetConfig = { ...widgetConfig, ...loadedData.widgetConfig };
+      console.log(`✅ Loaded ${chats.length} active chats from Firebase Firestore!`);
+    } else {
+      console.log('🔥 Initializing Firestore collections with seed data...');
+      for (const chat of chats) {
+        await syncChatToFirestore(chat);
+      }
+      for (const [cId, msgList] of Object.entries(messages)) {
+        for (const msg of msgList) {
+          await syncMessageToFirestore(msg);
+        }
+      }
+      await syncWidgetConfigToFirestore(widgetConfig);
+      console.log('✅ Initial Firestore seed completed!');
+    }
+
+    // Start Realtime Firestore Listeners
+    setupFirestoreRealtimeListeners(
+      (updatedChats) => {
+        if (updatedChats && updatedChats.length > 0) {
+          chats = updatedChats;
+          broadcast({ type: 'full_reset' });
+        }
+      },
+      (updatedMessages) => {
+        if (updatedMessages) {
+          messages = updatedMessages;
+          broadcast({ type: 'full_reset' });
+        }
+      }
+    );
+  } catch (err) {
+    console.error('⚠️ Firebase Firestore init error:', err);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
