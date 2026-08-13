@@ -30,6 +30,17 @@ const httpServer = createServer(app);
 
 app.use(express.json({ limit: '10mb' }));
 
+// CORS Middleware for External Embeds & Websites
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // In-memory Database
 let chats: ChatSession[] = [...INITIAL_CHATS];
 let messages: Record<string, ChatMessage[]> = { ...INITIAL_MESSAGES };
@@ -261,6 +272,7 @@ wss.on('connection', (ws: ClientSocket) => {
             senderAvatar,
             content,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            createdAt: new Date().toISOString(),
             isInternalNote: !!isInternalNote,
             attachments,
             readStatus: 'delivered',
@@ -292,6 +304,12 @@ wss.on('connection', (ws: ClientSocket) => {
             message: newMessage,
             chat: targetChat,
           });
+
+          // Sync to Firebase Firestore
+          if (targetChat) {
+            syncChatToFirestore(targetChat);
+          }
+          syncMessageToFirestore(newMessage);
 
           // ⚡ Instant 1-Second Google Sheet Save
           if (targetChat) {
@@ -341,9 +359,13 @@ wss.on('connection', (ws: ClientSocket) => {
               senderName: 'System',
               content: `${parsed.agentName} joined and was assigned to this chat.`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              createdAt: new Date().toISOString(),
               isInternalNote: true,
             };
             messages[parsed.chatId].push(sysMessage);
+
+            syncChatToFirestore(targetChat);
+            syncMessageToFirestore(sysMessage);
 
             broadcast({
               type: 'chat_updated',
@@ -417,6 +439,7 @@ async function triggerAiAutoReply(chatId: string, customerQuery: string) {
         senderAvatar: widgetConfig.botAvatar,
         content: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString(),
         readStatus: 'delivered',
         quickReplies: ['Talk to human agent', 'Check business hours', 'Request callback']
       };
@@ -647,48 +670,73 @@ app.post('/api/chats', (req, res) => {
   }
 
   const customerId = 'cust_' + Date.now();
+  let existingChat = chats.find((c) => c.id === newChatId);
 
-  const newChat: ChatSession = {
-    id: newChatId,
-    customerId,
-    customer: {
-      id: customerId,
-      name: customerName || 'ভিজিটর',
-      email: customerEmail || `${cleanPhone}@customer.com`,
-      phone: phone,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customerName || cleanPhone)}`,
-      location: 'ঢাকা, বাংলাদেশ',
-      ipAddress: ipAddress,
-      browser: deviceType,
-      currentPageUrl: 'https://novachat.app',
-      timeOnSite: '১ মিনিট',
-      visitsCount: 1,
-      tags: ['নতুন কাস্টমার', 'ফোন চ্যাট'],
-    },
-    department: department || 'গ্রাহক সহায়তা (Customer Support)',
-    status: 'unassigned',
-    priority: 'medium',
-    subject: subject || `চ্যাট অনুরোধ (ফোন: ${phone})`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    lastMessage: initialMessage || 'লাইভ চ্যাট শুরু করেছেন',
-    lastMessageTime: 'Just now',
-    unreadCountCustomer: 0,
-    unreadCountAgent: 1,
-  };
+  const newChat: ChatSession = existingChat
+    ? {
+        ...existingChat,
+        customer: {
+          ...existingChat.customer,
+          name: customerName || existingChat.customer.name,
+          email: customerEmail || existingChat.customer.email,
+          phone: phone || existingChat.customer.phone,
+        },
+        department: department || existingChat.department,
+        subject: subject || existingChat.subject,
+        updatedAt: new Date().toISOString(),
+        lastMessage: initialMessage || existingChat.lastMessage,
+        lastMessageTime: 'Just now',
+        unreadCountAgent: (existingChat.unreadCountAgent || 0) + 1,
+      }
+    : {
+        id: newChatId,
+        customerId,
+        customer: {
+          id: customerId,
+          name: customerName || 'ভিজিটর',
+          email: customerEmail || `${cleanPhone}@customer.com`,
+          phone: phone,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customerName || cleanPhone)}`,
+          location: 'ঢাকা, বাংলাদেশ',
+          ipAddress: ipAddress,
+          browser: deviceType,
+          currentPageUrl: 'https://novachat.app',
+          timeOnSite: '১ মিনিট',
+          visitsCount: 1,
+          tags: ['নতুন কাস্টমার', 'ফোন চ্যাট'],
+        },
+        department: department || 'গ্রাহক সহায়তা (Customer Support)',
+        status: 'unassigned',
+        priority: 'medium',
+        subject: subject || `চ্যাট অনুরোধ (ফোন: ${phone})`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastMessage: initialMessage || 'লাইভ চ্যাট শুরু করেছেন',
+        lastMessageTime: 'Just now',
+        unreadCountCustomer: 0,
+        unreadCountAgent: 1,
+      };
 
   const initialMsg: ChatMessage = {
     id: 'msg_init_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
     chatId: newChatId,
     senderRole: 'customer',
-    senderName: customerName || 'Visitor',
+    senderName: customerName || newChat.customer.name || 'Visitor',
     content: initialMessage || 'Hello, I need assistance.',
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: new Date().toISOString(),
     readStatus: 'delivered',
   };
 
-  chats.unshift(newChat);
-  messages[newChatId] = [initialMsg];
+  if (existingChat) {
+    const idx = chats.findIndex((c) => c.id === newChatId);
+    if (idx >= 0) chats[idx] = newChat;
+    if (!messages[newChatId]) messages[newChatId] = [];
+    messages[newChatId].push(initialMsg);
+  } else {
+    chats.unshift(newChat);
+    messages[newChatId] = [initialMsg];
+  }
 
   // Sync to Firestore
   syncChatToFirestore(newChat);
@@ -757,6 +805,7 @@ app.post('/api/chats/:id/messages', (req, res) => {
     senderAvatar: senderAvatar || targetChat.customer.avatar,
     content: content.trim(),
     timestamp: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+    createdAt: req.body.createdAt || new Date().toISOString(),
     isInternalNote: !!isInternalNote,
     attachments,
     readStatus: 'delivered',

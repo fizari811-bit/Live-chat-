@@ -684,12 +684,6 @@ export default function App() {
     );
 
     try {
-      await fetch(`/api/chats/${encodeURIComponent(customerChatId)}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMsg),
-      });
-    } catch (e) {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -702,7 +696,15 @@ export default function App() {
             attachments,
           })
         );
+      } else {
+        await fetch(`/api/chats/${encodeURIComponent(customerChatId)}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMsg),
+        });
       }
+    } catch (e) {
+      console.warn('Message send network warning:', e);
     }
 
     if (currentChat) {
@@ -788,12 +790,6 @@ export default function App() {
     );
 
     try {
-      await fetch(`/api/chats/${encodeURIComponent(chatId)}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMsg),
-      });
-    } catch (e) {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -806,7 +802,15 @@ export default function App() {
             isInternalNote,
           })
         );
+      } else {
+        await fetch(`/api/chats/${encodeURIComponent(chatId)}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMsg),
+        });
       }
+    } catch (e) {
+      console.warn('Admin message send warning:', e);
     }
 
     if (currentChat) {
