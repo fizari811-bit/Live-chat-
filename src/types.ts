@@ -132,4 +132,5 @@ export interface WidgetConfig {
   aiSystemPrompt: string;
   departments: string[];
   appsScriptUrl?: string;
+  websiteUrl?: string;
 }

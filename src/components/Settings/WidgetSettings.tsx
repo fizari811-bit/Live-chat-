@@ -450,6 +450,20 @@ function forwardSmsToNovaAdmin(phone, message, customerName) {
                 className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>
+
+            <div>
+              <label className="block font-semibold mb-1">কানেক্টেড ওয়েবসাইট লিংক (Website URL)</label>
+              <input
+                type="text"
+                value={config.websiteUrl || 'https://live-chat-swart-nine.vercel.app/'}
+                onChange={(e) => setConfig({ ...config, websiteUrl: e.target.value })}
+                placeholder="https://live-chat-swart-nine.vercel.app/"
+                className="w-full p-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                ফায়ারবেস ডেটাবেসে আপনার চ্যাট উইজেট ব্যাকএন্ডের সাথে যুক্ত লাইভ ওয়েবসাইট ইউআরএল।
+              </p>
+            </div>
           </div>
 
           {/* AI Auto-Responder */}

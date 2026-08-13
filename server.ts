@@ -1400,7 +1400,9 @@ async function startServer() {
       chats = loadedData.chats;
       messages = loadedData.messages || {};
       if (loadedData.widgetConfig) widgetConfig = { ...widgetConfig, ...loadedData.widgetConfig };
-      console.log(`✅ Loaded ${chats.length} active chats from Firebase Firestore!`);
+      widgetConfig.websiteUrl = 'https://live-chat-swart-nine.vercel.app/';
+      await syncWidgetConfigToFirestore(widgetConfig);
+      console.log(`✅ Loaded ${chats.length} active chats & synced websiteUrl to Firebase Firestore!`);
     } else {
       console.log('🔥 Initializing Firestore collections with seed data...');
       for (const chat of chats) {
