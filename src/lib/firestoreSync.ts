@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeFirestore,
   getFirestore,
   collection,
   doc,
@@ -32,7 +33,16 @@ const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreData
   ? firebaseConfig.firestoreDatabaseId
   : '(default)';
 
-export const db = getFirestore(firebaseApp, dbId);
+let firestoreDb: any;
+try {
+  firestoreDb = initializeFirestore(firebaseApp, {
+    experimentalAutoDetectLongPolling: true,
+  }, dbId);
+} catch (e) {
+  firestoreDb = getFirestore(firebaseApp, dbId);
+}
+
+export const db = firestoreDb;
 
 // Collection References
 const CHATS_COL = 'chats';
@@ -150,34 +160,46 @@ export function setupFirestoreRealtimeListeners(
 ) {
   try {
     // Listen to chats
-    onSnapshot(collection(db, CHATS_COL), (snapshot) => {
-      const chatsList: any[] = [];
-      snapshot.forEach((d) => chatsList.push(d.data()));
-      // Sort chats by updatedAt desc
-      chatsList.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-      onChatsUpdate(chatsList);
-    });
+    onSnapshot(
+      collection(db, CHATS_COL),
+      (snapshot) => {
+        const chatsList: any[] = [];
+        snapshot.forEach((d) => chatsList.push(d.data()));
+        // Sort chats by updatedAt desc
+        chatsList.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+        onChatsUpdate(chatsList);
+      },
+      (error) => {
+        console.warn('Firestore chats listener warning:', error.message || error);
+      }
+    );
 
     // Listen to messages
-    onSnapshot(collection(db, MESSAGES_COL), (snapshot) => {
-      const messagesMap: Record<string, any[]> = {};
-      snapshot.forEach((d) => {
-        const msg = d.data();
-        if (msg && msg.chatId) {
-          if (!messagesMap[msg.chatId]) messagesMap[msg.chatId] = [];
-          messagesMap[msg.chatId].push(msg);
-        }
-      });
-      // Sort messages in each chat chronologically
-      for (const chatId in messagesMap) {
-        messagesMap[chatId].sort((a, b) => {
-          const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
-          const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
-          return timeA - timeB;
+    onSnapshot(
+      collection(db, MESSAGES_COL),
+      (snapshot) => {
+        const messagesMap: Record<string, any[]> = {};
+        snapshot.forEach((d) => {
+          const msg = d.data();
+          if (msg && msg.chatId) {
+            if (!messagesMap[msg.chatId]) messagesMap[msg.chatId] = [];
+            messagesMap[msg.chatId].push(msg);
+          }
         });
+        // Sort messages in each chat chronologically
+        for (const chatId in messagesMap) {
+          messagesMap[chatId].sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+            const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+            return timeA - timeB;
+          });
+        }
+        onMessagesUpdate(messagesMap);
+      },
+      (error) => {
+        console.warn('Firestore messages listener warning:', error.message || error);
       }
-      onMessagesUpdate(messagesMap);
-    });
+    );
   } catch (err) {
     console.error('Error setting up Firestore realtime listeners:', err);
   }
