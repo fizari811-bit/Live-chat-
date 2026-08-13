@@ -105,9 +105,23 @@ export default function App() {
 
   // Customer Widget Chat Session ID
   const [customerChatId, setCustomerChatId] = useState<string | null>(() => {
-    const initialList = INITIAL_CHATS;
-    return initialList.length > 0 ? initialList[0].id : null;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('novachat_customer_chat_id') || null;
+    }
+    return null;
   });
+
+  useEffect(() => {
+    if (customerChatId) {
+      try {
+        localStorage.setItem('novachat_customer_chat_id', customerChatId);
+      } catch (e) {}
+    } else {
+      try {
+        localStorage.removeItem('novachat_customer_chat_id');
+      } catch (e) {}
+    }
+  }, [customerChatId]);
 
   // LocalStorage state persistence
   useEffect(() => {
@@ -233,12 +247,17 @@ export default function App() {
     });
   };
 
-  // Connect WebSocket & Fetch Initial REST Data
+  // Connect WebSocket & Fetch Initial REST Data (with 3-second continuous sync)
   useEffect(() => {
     fetchInitialData();
     connectWebSocket();
 
+    const intervalId = setInterval(() => {
+      fetchInitialData();
+    }, 3000);
+
     return () => {
+      clearInterval(intervalId);
       wsRef.current?.close();
     };
   }, []);
@@ -1119,6 +1138,7 @@ export default function App() {
               onSendQuickReply={(text) => handleSendCustomerMessage(text)}
               onTyping={handleCustomerTyping}
               onSubmitRating={handleSubmitRating}
+              onNewChat={() => setCustomerChatId(null)}
               isTypingAgent={isTypingAgent}
             />
           </div>

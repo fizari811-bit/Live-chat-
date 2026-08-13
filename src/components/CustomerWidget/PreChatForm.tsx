@@ -16,18 +16,26 @@ interface PreChatFormProps {
 
 export const PreChatForm: React.FC<PreChatFormProps> = ({ widgetConfig, onSubmit }) => {
   const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('01712345678');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [department, setDepartment] = useState(widgetConfig.departments[0] || 'Customer Support');
+  const [department, setDepartment] = useState(widgetConfig.departments[0] || 'গ্রাহক সহায়তা (Customer Support)');
   const [subject, setSubject] = useState('');
   const [initialMessage, setInitialMessage] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || !initialMessage.trim()) return;
+    if (!customerName.trim() || !customerPhone.trim() || !initialMessage.trim()) {
+      alert('অনুগ্রহ করে নাম, ১০/১১ ডিজিটের মোবাইল নম্বর এবং আপনার মেসেজটি প্রদান করুন।');
+      return;
+    }
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 10) {
+      alert('অনুগ্রহ করে একটি সঠিক ১০ বা ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন (যেমন: 01712345678)।');
+      return;
+    }
     onSubmit({
       customerName,
-      customerPhone,
+      customerPhone: cleanPhone,
       customerEmail,
       department,
       subject,

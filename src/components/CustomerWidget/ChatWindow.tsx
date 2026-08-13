@@ -11,6 +11,7 @@ interface ChatWindowProps {
   onTyping: (isTyping: boolean) => void;
   onEndChat: () => void;
   onCloseWidget: () => void;
+  onNewChat?: () => void;
   isTypingAgent?: string | null;
 }
 
@@ -25,6 +26,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onTyping,
   onEndChat,
   onCloseWidget,
+  onNewChat,
   isTypingAgent
 }) => {
   const [inputText, setInputText] = useState('');
@@ -113,6 +115,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {onNewChat && (
+            <button
+              onClick={onNewChat}
+              title="নতুন মোবাইল নম্বর দিয়ে নতুন চ্যাট শুরু করুন"
+              className="px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded-md text-[11px] font-semibold transition"
+            >
+              + নতুন চ্যাট
+            </button>
+          )}
           <button
             onClick={onEndChat}
             title="চ্যাট শেষ করুন ও রেটিং দিন"

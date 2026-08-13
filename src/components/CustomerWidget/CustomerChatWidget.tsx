@@ -21,6 +21,7 @@ interface CustomerChatWidgetProps {
   onSendQuickReply: (text: string) => void;
   onTyping: (isTyping: boolean) => void;
   onSubmitRating: (rating: number, feedback: string) => void;
+  onNewChat?: () => void;
   isTypingAgent?: string | null;
 }
 
@@ -33,6 +34,7 @@ export const CustomerChatWidget: React.FC<CustomerChatWidgetProps> = ({
   onSendQuickReply,
   onTyping,
   onSubmitRating,
+  onNewChat,
   isTypingAgent
 }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -103,6 +105,7 @@ export const CustomerChatWidget: React.FC<CustomerChatWidgetProps> = ({
               onTyping={onTyping}
               onEndChat={() => setIsRatingStep(true)}
               onCloseWidget={() => setIsOpen(false)}
+              onNewChat={onNewChat}
               isTypingAgent={isTypingAgent}
             />
           )}
