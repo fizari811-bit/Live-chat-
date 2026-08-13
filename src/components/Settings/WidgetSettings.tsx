@@ -39,7 +39,8 @@ export const WidgetSettings: React.FC<WidgetSettingsProps> = ({ widgetConfig, on
     setTimeout(() => setSavedSuccess(false), 2000);
   };
 
-  // Google Apps Script Code Snippet for Users (Zero API Key needed!)
+  // Google Apps Script Code Snippet for Two-Way Google Sheet <-> Admin Sync
+  const hostOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com';
   const APPS_SCRIPT_CODE = `function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
@@ -59,6 +60,22 @@ export const WidgetSettings: React.FC<WidgetSettingsProps> = ({ widgetConfig, on
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({result: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// 📱 Auto Forward New SMS from Google Sheet / Mobile App to NovaChat Admin Panel
+function forwardSmsToNovaAdmin(phone, message, customerName) {
+  var ADMIN_WEBHOOK = "${hostOrigin}/api/webhook/sms";
+  var payload = {
+    phone: phone,
+    message: message,
+    customerName: customerName || "SMS Customer"
+  };
+  
+  UrlFetchApp.fetch(ADMIN_WEBHOOK, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload)
+  });
 }`;
 
   const handleCopyScript = () => {

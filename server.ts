@@ -435,6 +435,120 @@ async function triggerAiAutoReply(chatId: string, customerQuery: string) {
   }
 }
 
+// INCOMING SMS & GOOGLE SHEET WEBHOOK (Phone -> Google Sheet / App -> Admin Realtime)
+app.all(['/api/webhook/sms', '/api/webhook/google-sheet', '/api/webhook/incoming', '/api/incoming-sms'], (req, res) => {
+  const payload = { ...req.query, ...req.body };
+
+  let smsList: any[] = [];
+  if (Array.isArray(payload.rows)) {
+    smsList = payload.rows;
+  } else if (Array.isArray(payload.messages)) {
+    smsList = payload.messages;
+  } else {
+    smsList = [payload];
+  }
+
+  const processed: any[] = [];
+
+  smsList.forEach((item) => {
+    const phone = item.phone || item.customerPhone || item.from || item.sender || item.mobile || item.number || '01712345678';
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '') || '01712345678';
+    const content = item.message || item.content || item.text || item.sms || item.body || item.initialMessage;
+
+    if (!content || !String(content).trim()) return;
+
+    const customerName = item.customerName || item.name || item.senderName || `কাস্টমার (${phone})`;
+    const ipAddress = item.ipAddress || item.ip || '103.205.132.42';
+    const customChatId = item.chatId || item.id;
+
+    // Find existing chat by customChatId or matching clean phone number
+    let targetChat = chats.find((c) => {
+      if (customChatId && c.id === customChatId) return true;
+      if (c.customer && c.customer.phone && String(c.customer.phone).replace(/[^0-9]/g, '').includes(cleanPhone)) return true;
+      if (c.id && c.id.includes(cleanPhone)) return true;
+      return false;
+    });
+
+    const chatId = targetChat ? targetChat.id : (customChatId || `CHAT-${cleanPhone}-${ipAddress}`);
+
+    if (!targetChat) {
+      const customerId = 'cust_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      targetChat = {
+        id: chatId,
+        customerId,
+        customer: {
+          id: customerId,
+          name: customerName,
+          email: `${cleanPhone}@customer.com`,
+          phone: String(phone),
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customerName || cleanPhone)}`,
+          location: 'ঢাকা, বাংলাদেশ',
+          ipAddress: ipAddress,
+          browser: 'Mobile SMS Gateway',
+          currentPageUrl: 'SMS / Phone',
+          timeOnSite: '১ মিনিট',
+          visitsCount: 1,
+          tags: ['SMS কাস্টমার', 'মোবাইল চ্যাট'],
+        },
+        department: item.department || 'গ্রাহক সহায়তা (Customer Support)',
+        status: 'unassigned',
+        priority: 'high',
+        subject: `এসএমএস চ্যাট (ফোন: ${phone})`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastMessage: String(content),
+        lastMessageTime: 'Just now',
+        unreadCountCustomer: 0,
+        unreadCountAgent: 1,
+      };
+
+      chats.unshift(targetChat);
+      broadcast({
+        type: 'new_chat_created',
+        chat: targetChat,
+      });
+    }
+
+    const newMsg: ChatMessage = {
+      id: 'msg_sms_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      chatId: chatId,
+      senderRole: 'customer',
+      senderName: customerName,
+      senderAvatar: targetChat.customer.avatar,
+      content: String(content).trim(),
+      timestamp: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+      readStatus: 'delivered',
+    };
+
+    if (!messages[chatId]) messages[chatId] = [];
+    messages[chatId].push(newMsg);
+
+    targetChat.updatedAt = new Date().toISOString();
+    targetChat.lastMessage = String(content).trim();
+    targetChat.lastMessageTime = 'Just now';
+    targetChat.unreadCountAgent = (targetChat.unreadCountAgent || 0) + 1;
+
+    broadcast({
+      type: 'new_message',
+      chatId: chatId,
+      message: newMsg,
+      chat: targetChat,
+    });
+
+    processed.push({ chatId, messageId: newMsg.id, phone, content });
+  });
+
+  if (processed.length === 0) {
+    return res.status(400).json({ error: 'মেসেজের কনটেন্ট বা ফোন নম্বর পাওয়া যায়নি। (phone and message content required)' });
+  }
+
+  res.json({
+    success: true,
+    message: `${processed.length} টি এসএমএস অ্যাডমিন ইনবক্সে যুক্ত হয়েছে!`,
+    processed,
+  });
+});
+
 // REST API Endpoints
 
 // Reset Demo Data
