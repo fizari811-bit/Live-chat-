@@ -21,6 +21,7 @@ export interface ChatMessage {
   }[];
   quickReplies?: string[];
   readStatus?: 'sent' | 'delivered' | 'read';
+  createdAt?: string;
 }
 
 export interface CustomerInfo {

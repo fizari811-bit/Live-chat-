@@ -278,7 +278,7 @@ export default function App() {
       if (messagesRes.ok) {
         const msgs = await messagesRes.json();
         if (msgs && typeof msgs === 'object') {
-          setMessages((prev) => ({ ...prev, ...msgs }));
+          setMessages(msgs);
         }
       }
       if (agentsRes.ok) setAgents(await agentsRes.json());

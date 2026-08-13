@@ -74,8 +74,12 @@ export async function deleteChatFromFirestore(chatId: string) {
 export async function syncMessageToFirestore(message: any) {
   if (!message || !message.id) return;
   try {
+    const cleanData = JSON.parse(JSON.stringify(message));
+    if (!cleanData.createdAt) {
+      cleanData.createdAt = new Date().toISOString();
+    }
     const msgRef = doc(db, MESSAGES_COL, message.id);
-    await setDoc(msgRef, JSON.parse(JSON.stringify(message)), { merge: true });
+    await setDoc(msgRef, cleanData, { merge: true });
   } catch (err) {
     console.error(`Firestore sync error for message ${message.id}:`, err);
   }
@@ -111,6 +115,15 @@ export async function loadFirestoreData() {
         loadedMessages[msg.chatId].push(msg);
       }
     });
+
+    // Sort messages in each chat chronologically
+    for (const chatId in loadedMessages) {
+      loadedMessages[chatId].sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+        const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+        return timeA - timeB;
+      });
+    }
 
     let loadedConfig = null;
     settingsSnap.forEach((docSnap) => {
@@ -155,6 +168,14 @@ export function setupFirestoreRealtimeListeners(
           messagesMap[msg.chatId].push(msg);
         }
       });
+      // Sort messages in each chat chronologically
+      for (const chatId in messagesMap) {
+        messagesMap[chatId].sort((a, b) => {
+          const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+          const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+          return timeA - timeB;
+        });
+      }
       onMessagesUpdate(messagesMap);
     });
   } catch (err) {

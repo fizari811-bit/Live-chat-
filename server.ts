@@ -429,7 +429,10 @@ async function triggerAiAutoReply(chatId: string, customerQuery: string) {
         targetChat.lastMessage = replyText;
         targetChat.lastMessageTime = 'Just now';
         targetChat.updatedAt = new Date().toISOString();
+        syncChatToFirestore(targetChat);
       }
+
+      syncMessageToFirestore(botMessage);
 
       broadcast({
         type: 'new_message',
@@ -720,6 +723,12 @@ app.get('/api/chats/:id', (req, res) => {
   if (role === 'customer') chat.unreadCountCustomer = 0;
 
   res.json({ chat, messages: chatMessages });
+});
+
+// GET Messages for Single Chat
+app.get('/api/chats/:id/messages', (req, res) => {
+  const chatMessages = messages[req.params.id] || [];
+  res.json(chatMessages);
 });
 
 // POST New Message to a Chat

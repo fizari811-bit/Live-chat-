@@ -53,7 +53,7 @@ export const CustomerChatWidget: React.FC<CustomerChatWidgetProps> = ({
       {isOpen && (
         <div
           id="customer-widget-popup"
-          className="w-[360px] sm:w-[390px] h-[520px] mb-3 transition-all duration-200 animate-in fade-in slide-in-from-bottom-5"
+          className="w-[320px] sm:w-[355px] h-[465px] mb-3 transition-all duration-200 animate-in fade-in slide-in-from-bottom-5"
         >
           {isRatingStep ? (
             <div className="bg-white rounded-2xl h-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col justify-center">
