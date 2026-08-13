@@ -15,6 +15,7 @@ import {
 import { ChatSession, ChatMessage, Agent, CannedResponse, LiveVisitor, WidgetConfig, BlockedUser, AdminUser } from './src/types.js';
 import {
   syncChatToFirestore,
+  deleteChatFromFirestore,
   syncMessageToFirestore,
   syncWidgetConfigToFirestore,
   loadFirestoreData,
@@ -828,6 +829,21 @@ app.patch('/api/chats/:id', (req, res) => {
   res.json(chat);
 });
 
+// DELETE Chat
+app.delete('/api/chats/:id', async (req, res) => {
+  const chatId = req.params.id;
+  chats = chats.filter((c) => c.id !== chatId);
+  delete messages[chatId];
+
+  await deleteChatFromFirestore(chatId);
+
+  broadcast({
+    type: 'full_reset'
+  });
+
+  res.json({ success: true, message: 'Chat deleted successfully' });
+});
+
 // POST Feedback / Rating
 app.post('/api/chats/:id/feedback', (req, res) => {
   const chat = chats.find((c) => c.id === req.params.id);
@@ -1388,6 +1404,29 @@ async function startServer() {
       }
       await syncWidgetConfigToFirestore(widgetConfig);
       console.log('✅ Initial Firestore seed completed!');
+    }
+
+    // Filter out and remove demo chats (Sabiha, Hasan Mahmud)
+    const demoChatIdsToDelete: string[] = [];
+    chats = chats.filter((c) => {
+      const isDemo =
+        c.customer?.name?.includes('সাবিহা') ||
+        c.customer?.name?.includes('Sabiha') ||
+        c.customer?.name?.includes('হাসান') ||
+        c.customer?.name?.includes('Hasan') ||
+        c.id === 'CHAT-01712345678-103.205.132.10' ||
+        c.id === 'CHAT-01819876543-103.112.50.46';
+      if (isDemo) {
+        demoChatIdsToDelete.push(c.id);
+        return false;
+      }
+      return true;
+    });
+
+    for (const id of demoChatIdsToDelete) {
+      delete messages[id];
+      await deleteChatFromFirestore(id);
+      console.log(`🗑️ Deleted demo chat ${id} from Firestore!`);
     }
 
     // Start Realtime Firestore Listeners

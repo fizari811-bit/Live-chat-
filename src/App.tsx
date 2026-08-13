@@ -247,14 +247,14 @@ export default function App() {
     });
   };
 
-  // Connect WebSocket & Fetch Initial REST Data (with 3-second continuous sync)
+  // Connect WebSocket & Fetch Initial REST Data (with 5-second continuous sync)
   useEffect(() => {
     fetchInitialData();
     connectWebSocket();
 
     const intervalId = setInterval(() => {
       fetchInitialData();
-    }, 3000);
+    }, 5000);
 
     return () => {
       clearInterval(intervalId);
@@ -990,6 +990,14 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleDeleteChat = async (chatId: string) => {
+    setChats((prev) => prev.filter((c) => c.id !== chatId));
+    if (selectedChatId === chatId) setSelectedChatId(null);
+    try {
+      await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+    } catch (e) {}
+  };
+
   const handleAgentStatusChange = async (status: 'online' | 'away' | 'offline') => {
     const updated = { ...activeAgent, status };
     setActiveAgent(updated);
@@ -1194,6 +1202,7 @@ export default function App() {
               onUpdateCustomerMeta={handleUpdateCustomerMeta}
               onBlockUser={handleBlockUser}
               onUnblockUser={handleUnblockUser}
+              onDeleteChat={handleDeleteChat}
             />
           </div>
         )}

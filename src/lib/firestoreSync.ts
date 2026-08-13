@@ -50,6 +50,26 @@ export async function syncChatToFirestore(chat: any) {
   }
 }
 
+// Delete a Chat and its messages from Firestore
+export async function deleteChatFromFirestore(chatId: string) {
+  if (!chatId) return;
+  try {
+    const chatRef = doc(db, CHATS_COL, chatId);
+    await deleteDoc(chatRef);
+
+    // Also remove messages for this chat
+    const messagesSnap = await getDocs(collection(db, MESSAGES_COL));
+    messagesSnap.forEach(async (docSnap) => {
+      const msg = docSnap.data();
+      if (msg && msg.chatId === chatId) {
+        await deleteDoc(doc(db, MESSAGES_COL, docSnap.id));
+      }
+    });
+  } catch (err) {
+    console.error(`Firestore delete error for chat ${chatId}:`, err);
+  }
+}
+
 // Save or Update a Message in Firestore
 export async function syncMessageToFirestore(message: any) {
   if (!message || !message.id) return;

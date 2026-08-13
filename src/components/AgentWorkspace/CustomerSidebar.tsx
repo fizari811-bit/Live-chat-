@@ -21,13 +21,15 @@ interface CustomerSidebarProps {
   onUpdateCustomerMeta: (chatId: string, updates: { notes?: string; tags?: string[] }) => void;
   onBlockUser?: (chatId: string, phone?: string, ipAddress?: string, name?: string, reason?: string) => void;
   onUnblockUser?: (id: string) => void;
+  onDeleteChat?: (chatId: string) => void;
 }
 
 export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
   chat,
   onUpdateCustomerMeta,
   onBlockUser,
-  onUnblockUser
+  onUnblockUser,
+  onDeleteChat
 }) => {
   const [newTag, setNewTag] = useState('');
   const [notes, setNotes] = useState(chat?.customer.notes || '');
@@ -101,12 +103,27 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
             <span>🔓 ইউজার আনব্লক করুন</span>
           </button>
         ) : (
-          <button
-            onClick={() => onBlockUser && onBlockUser(chat.id, chat.customer.phone, chat.customer.ipAddress, chat.customer.name, 'ইনবক্স সাইডবার হতে ব্লক')}
-            className="w-full mt-2.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
-          >
-            <span>🚫 চ্যাট আইডি ব্লক করুন</span>
-          </button>
+          <div className="space-y-1.5 mt-2.5">
+            <button
+              onClick={() => onBlockUser && onBlockUser(chat.id, chat.customer.phone, chat.customer.ipAddress, chat.customer.name, 'ইনবক্স সাইডবার হতে ব্লক')}
+              className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+            >
+              <span>🚫 চ্যাট আইডি ব্লক করুন</span>
+            </button>
+
+            {onDeleteChat && (
+              <button
+                onClick={() => {
+                  if (confirm('আপনি কি নিশ্চিত যে এই চ্যাটটি সম্পূর্ণ মুছে ফেলতে চান?')) {
+                    onDeleteChat(chat.id);
+                  }
+                }}
+                className="w-full py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-semibold text-xs rounded-xl border border-slate-200 transition flex items-center justify-center gap-1.5"
+              >
+                <span>🗑️ চ্যাট মুছে ফেলুন</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
 
