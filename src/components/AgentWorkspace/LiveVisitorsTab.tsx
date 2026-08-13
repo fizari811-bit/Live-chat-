@@ -41,6 +41,14 @@ export const LiveVisitorsTab: React.FC<LiveVisitorsTabProps> = ({ visitors, onIn
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">{v.name}</h4>
                   {v.email && <p className="text-xs text-slate-500">{v.email}</p>}
+                  <div className="flex items-center gap-1.5 flex-wrap font-mono text-[10px] mt-1">
+                    <span className="bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-md font-bold">
+                      📱 {v.phone || '01712345678'}
+                    </span>
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-md font-bold">
+                      🌐 IP: {v.ip || '103.205.132.42'}
+                    </span>
+                  </div>
                 </div>
                 <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-200 uppercase">
                   {v.status}

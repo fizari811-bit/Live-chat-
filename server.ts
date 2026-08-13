@@ -450,6 +450,31 @@ app.post('/api/reset-demo', (req, res) => {
   res.json({ success: true });
 });
 
+// GET Client IP & Device Info
+app.get('/api/client-info', (req, res) => {
+  const rawIp = (req.headers['x-forwarded-for'] as string) ||
+                (req.headers['x-real-ip'] as string) ||
+                (req.headers['cf-connecting-ip'] as string) ||
+                req.socket.remoteAddress ||
+                '103.205.132.42';
+  const ipAddress = rawIp.split(',')[0].replace('::ffff:', '').trim() || '103.205.132.42';
+
+  const userAgent = req.headers['user-agent'] || '';
+  let deviceType = 'Chrome / Web Widget';
+  if (/android/i.test(userAgent)) deviceType = 'Android Mobile Phone';
+  else if (/iphone/i.test(userAgent)) deviceType = 'iPhone Mobile Device';
+  else if (/ipad/i.test(userAgent)) deviceType = 'iPad Mobile Device';
+  else if (/mobile/i.test(userAgent)) deviceType = 'Mobile Phone Device';
+  else if (/macintosh|mac os x/i.test(userAgent)) deviceType = 'macOS Desktop';
+  else if (/windows/i.test(userAgent)) deviceType = 'Windows PC';
+
+  res.json({
+    ipAddress,
+    deviceType,
+    userAgent,
+  });
+});
+
 // GET Chats
 app.get('/api/chats', (req, res) => {
   res.json(chats);
@@ -465,11 +490,21 @@ app.post('/api/chats', (req, res) => {
   const { customerName, customerPhone, customerEmail, department, subject, initialMessage } = req.body;
   
   // Extract or fallback IP address
-  const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '103.205.132.42';
+  const rawIp = (req.headers['x-forwarded-for'] as string) ||
+                (req.headers['x-real-ip'] as string) ||
+                (req.headers['cf-connecting-ip'] as string) ||
+                req.socket.remoteAddress ||
+                '103.205.132.42';
   const ipAddress = rawIp.split(',')[0].replace('::ffff:', '').trim() || '103.205.132.42';
   const phone = customerPhone || '01712345678';
   const cleanPhone = phone.replace(/[^0-9]/g, '') || '01712345678';
   
+  const userAgent = req.headers['user-agent'] || '';
+  let deviceType = 'Chrome / Mobile App';
+  if (/android/i.test(userAgent)) deviceType = 'Android Smartphone';
+  else if (/iphone/i.test(userAgent)) deviceType = 'Apple iPhone';
+  else if (/mobile/i.test(userAgent)) deviceType = 'Mobile Phone';
+
   // Generate Chat ID using Phone and IP Address
   const newChatId = `CHAT-${cleanPhone}-${ipAddress}`;
 
@@ -494,7 +529,7 @@ app.post('/api/chats', (req, res) => {
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(customerName || cleanPhone)}`,
       location: 'ঢাকা, বাংলাদেশ',
       ipAddress: ipAddress,
-      browser: 'Chrome / Web Widget',
+      browser: deviceType,
       currentPageUrl: 'https://novachat.app',
       timeOnSite: '১ মিনিট',
       visitsCount: 1,

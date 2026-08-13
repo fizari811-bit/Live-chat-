@@ -123,9 +123,18 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                     <span className="text-[10px] text-slate-400 shrink-0">{chat.lastMessageTime}</span>
                   </div>
 
-                  <p className="text-[10px] font-mono text-blue-700 font-bold truncate mb-1">
+                  <p className="text-[10px] font-mono text-slate-600 font-bold truncate mb-1 bg-slate-100 px-1.5 py-0.5 rounded-md inline-block">
                     🆔 {chat.id}
                   </p>
+
+                  <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono mb-1.5">
+                    <span className="bg-blue-50 text-blue-700 border border-blue-200/80 px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1">
+                      📱 {chat.customer.phone || '01712345678'}
+                    </span>
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1">
+                      🌐 IP: {chat.customer.ipAddress || '103.205.132.42'}
+                    </span>
+                  </div>
 
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
